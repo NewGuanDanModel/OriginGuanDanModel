@@ -424,9 +424,9 @@ class ExampleClient(WebSocketClient):
                 f.write(f"The end sequence is {message['order']}\n")
                 f.close()
             
-            with open('zhaotianjun_vs_model.log', 'a+') as f:
+            with open('human_vs_model.log', 'a+') as f:
                 f.write(f"========================\n")
-                f.write(f"zhaotianjun vs train19/27500\n")
+                f.write(f"human vs train20/24500\n")
                 value = 0.0
                 d = 1.0
                 for item in self.tongji.items():
