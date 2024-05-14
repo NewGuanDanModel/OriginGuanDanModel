@@ -9,7 +9,7 @@ from time import sleep
 import numpy as np
 import zmq
 from pyarrow import deserialize, serialize
-from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation
+from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation, get_power_of_action, STATE_NUM
 from ws4py.client.threadedclient import WebSocketClient
 
 warnings.filterwarnings("ignore")
@@ -419,35 +419,43 @@ class ExampleClient(WebSocketClient):
         myself = len(message['handCards'])
         
         if opponents[0] == 0 and opponents[1] > 0:
-            if opponents[1] >= 19:
+            if opponents[1] >= STATE_NUM[0]:
                 return 'start'
-            elif opponents[1] >= 13:
+            elif opponents[1] >= STATE_NUM[1]:
                 return 'middle'
-            elif opponents[1] >= 8:
+            elif opponents[1] >= STATE_NUM[2]:
                 return 'end'
             else:
                 return 'almost over'
         elif opponents[1] == 0 and opponents[0] > 0:
-            if opponents[0] >= 19:
+            if opponents[0] >= STATE_NUM[0]:
                 return 'start'
-            elif opponents[0] >= 13:
+            elif opponents[0] >= STATE_NUM[1]:
                 return 'middle'
-            elif opponents[0] >= 8:
+            elif opponents[0] >= STATE_NUM[2]:
                 return 'end'
             else:
                 return 'almost over'
         else:
-            if opponents[0] >= 19 and opponents[1] >= 19:
-                if myself <= 10:
+            if opponents[0] >= STATE_NUM[0] and opponents[1] >= STATE_NUM[0]:
+                if myself < STATE_NUM[1]:
                     return 'end'
-                elif myself < 19 and myself > 10:
+                elif myself < STATE_NUM[0] and myself >= STATE_NUM[1]:
                     return 'middle'
                 else:
                     return 'start'
-            elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
-                return 'middle'
-            elif (opponents[0] >= 8 or opponents[1] >= 8):
-                return 'end'
+            elif (opponents[0] < STATE_NUM[0] and opponents[0] >= STATE_NUM[1] and opponents[1] >= STATE_NUM[1]) or (opponents[1] < STATE_NUM[0] and opponents[1] >= STATE_NUM[1] and opponents[0] >= STATE_NUM[1]):
+                if myself >= STATE_NUM[0]:
+                    return 'start'
+                elif myself >= STATE_NUM[1]:
+                    return 'middle'
+                else:
+                    return 'end'
+            elif (opponents[0] >= STATE_NUM[2] or opponents[1] >= STATE_NUM[2]):
+                if myself >= STATE_NUM[1]:
+                    return 'middle'
+                else:
+                    return 'end'
             else:
                 return 'almost over'
     
@@ -463,11 +471,11 @@ class ExampleClient(WebSocketClient):
                     if situation == 'start':
                         penalty[i] -= 0.8
                         if action[0] == 'StraightFlush':
-                            penalty[i] -= 0.2
+                            penalty[i] -= 0.4
                     elif situation == 'middle':
                         penalty[i] -= 0.2
                         if action[0] == 'StraightFlush':
-                            penalty[i] -= 0.1
+                            penalty[i] -= 0.2
                     elif situation == 'almost over':
                         penalty[i] += 0.3
                 for card in action[2]:
@@ -496,19 +504,35 @@ class ExampleClient(WebSocketClient):
                 for j in range(2):
                     opponent = opponents[j]
                     if opponent == 1 and action[0] != 'Single':
-                        addition[i] += (0.2 - j * 0.1)
-                    elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
-                        addition[i] += (0.15 - j * 0.1)
+                        if action[0] == 'Bomb' or action[0] == 'StraightFlush':
+                            addition[i] += 0.5
+                        else:
+                            addition[i] += (0.2 - j * 0.1)
+                    elif opponent == 2:
+                        if action[0] == 'Single':
+                            addition[i] += (-0.2 + get_power_of_action(action, self.current_rank) * 0.035)
+                        elif action[0] != 'Pair':
+                            if action[0] == 'Bomb' or action[0] == 'StraightFlush':
+                                addition[i] += 0.5
+                            else:
+                                addition[i] += (0.15 - j * 0.1)
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        addition[i] += (0.15 - j * 0.1)
+                        if action[0] == 'Bomb' or action[0] == 'StraightFlush':
+                            addition[i] += 0.5
+                        else:
+                            addition[i] += (0.2 - j * 0.1)
                     elif opponent == 4 and not (action[0] in ['Single', 'Pair', 'Trips']):
                         addition[i] += (0.15 - j * 0.1)
                         if (action[0] == 'Bomb' and len(action[2]) >= 4 or action[0] == 'StraightFlush'):
-                            addition[i] += (0.15 - j * 0.1)
+                            addition[i] += 0.5
+                            if action[0] == 'StraightFlush':
+                                addition[i] += 0.2
                     elif opponent == 5 and not (action[0] in ['Single', 'Pair', 'Trips', 'Straight', 'StraightFlush', 'ThreeWithTwo']) \
                         or (action[0] == 'Bomb' and len(action[2]) >= 5 or (len(action[2]) == 4 and 'SB' in action[2])) \
                         or (action[0] == 'StraightFlush'):
-                        addition[i] += (0.15 - j * 0.1)
+                        addition[i] += 0.35
+                        if action[0] == 'StraightFlush' or action[0] == 'Bomb' and (action[1] == 'JOKER' or len(action[2]) >= 5):
+                            addition[i] += 0.2
             bomb_size = None
             if action[0] == 'Bomb':
                 bomb_size = len(action[2])

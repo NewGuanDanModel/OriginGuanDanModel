@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from multiprocessing import Process
 
 from math import exp
+from typing import List
 import random
 
 import numpy as np
@@ -53,10 +54,22 @@ class Player():
     def sample(self, state) -> int:
         output = self.model.forward(state['x_batch'])
         size = len(output)
+        if size == 1:
+            return 0
         for i in range(size):
             output[i] += state['addition'][i] + state['penalty'][i]
+        # top_2_indices = self.find_top_k_elements_indices(output.copy(), 2)
+        # dummy = exp(output[top_2_indices[0]]) + exp(output[top_2_indices[1]])
+        # weights = np.array([exp(output[top_2_indices[0]]) / dummy, exp(output[top_2_indices[1]]) / dummy],dtype=np.float32)
+        # choice = np.random.choice(top_2_indices, 1, p=weights)[0]
         return np.argmax(output)
-
+    
+    def find_top_k_elements_indices(self, array, k : int) -> List[int]:
+        res = []
+        for i in range(max(k, 1)):
+            res.append(np.argmax(array))
+            array[i] = -1e10
+        return res
 
 def run_one_player(index, args):
     player = Player(index,args)

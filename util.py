@@ -1,7 +1,11 @@
 from collections import Counter
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
+
+LevelToNum = {
+    '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, 'T': 9, 'J': 10, 'Q': 11, 'K': 12, 'A': 13, 'B' : 14, 'R' : 15, 'JOKER' : 16
+}
 
 CardToNum = {
     'H2':0, 'H3':1, 'H4':2, 'H5':3, 'H6':4, 'H7':5, 'H8':6, 'H9':7, 'HT':8, 'HJ':9, 'HQ':10, 'HK':11, 'HA':12,
@@ -18,6 +22,8 @@ CardToStr = {
     'D2':"方块2", 'D3':"方块3", 'D4':"方块4", 'D5':"方块5", 'D6':"方块6", 'D7':"方块7", 'D8':"方块8", 'D9':"方块9", 'DT':"方块10", 'DJ':"方块J", 'DQ':"方块Q", 'DK':"方块K", 'DA':"方块A",
     'SB':"小王", 'HR':"大王"
 }
+
+STATE_NUM = [20, 13, 7]
 
 def get_score_by_situation(situation : str, level : str, t : str, bomb_size : Optional[int]):
     if t == "PASS":
@@ -55,6 +61,21 @@ def get_score_by_situation(situation : str, level : str, t : str, bomb_size : Op
             for i in range(size):
                 addition[i] = min(i * 0.02, 0.12)
     return dict(zip(origin_rank, addition))
+
+def get_power_of_action(action : List, level : int) -> int:
+    power = action[1]
+    t = action[0]
+    if t not in ['Straight', 'StraightFlush', 'TwoTrips', 'ThreePair']:
+        if level == 13:
+            return LevelToNum[power]
+        else:
+            powerToNum = LevelToNum[power]
+            if powerToNum < level:
+                return powerToNum
+            else:
+                return powerToNum - 1
+    else:
+        return LevelToNum[power]
 
 def card2num(list_cards):      # 将字符串转换成数字
     res = []   
