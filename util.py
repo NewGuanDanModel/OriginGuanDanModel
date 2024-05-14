@@ -36,16 +36,16 @@ def get_score_by_situation(situation : str, level : str, t : str, bomb_size : Op
         if t in ['Single', 'Pair']:
             for i in range(size):
                 addition[i] = max(0.1 - i * 0.005, 0.06)
-        else:
+        elif t not in ['StraightFlush', 'Bomb']:
             for i in range(size):
-                addition[i] = 0.2 - i * 0.03
+                addition[i] = 0.2 - i * 0.035
     elif situation == 'end':
         if t == 'Bomb' or t == 'StraightFlush':
             for i in range(size):
-                addition[i] = max(0.2 - i * 0.02, 0.05)
+                addition[i] = max(0.1 - i * 0.02, 0.05)
         else:
             for i in range(size):
-                addition[i] = min(i * 0.01, 0.06)
+                addition[i] = min(i * 0.01, 0.05)
     elif situation == 'almost over':
         if t == 'Bomb' or t == 'StraightFlush':
             for i in range(size):

@@ -460,8 +460,12 @@ class ExampleClient(WebSocketClient):
                 if action[0] == 'Bomb' or action[0] == 'StraightFlush':
                     if situation == 'start':
                         penalty[i] -= 0.8
+                        if action[0] == 'StraightFlush':
+                            penalty[i] -= 0.2
                     elif situation == 'middle':
                         penalty[i] -= 0.2
+                        if action[0] == 'StraightFlush':
+                            penalty[i] -= 0.1
                     elif situation == 'almost over':
                         penalty[i] += 0.3
                 for card in action[2]:
