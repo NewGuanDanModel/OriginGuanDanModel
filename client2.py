@@ -424,23 +424,59 @@ class ExampleClient(WebSocketClient):
         return res
 
     def current_situation(self, message):
+        # opponents = [self.remaining[(self.mypos + 1) % 4], self.remaining[(self.mypos + 3) % 4]]
+        # #teammate = self.remaining[(self.mypos + 2) % 4]
+        # myself = len(message['handCards'])
+        
+        # if opponents[0] >= 19 and opponents[1] >= 19:
+        #     if myself <= 10:
+        #         return 'end'
+        #     elif myself < 19 and myself > 10:
+        #         return 'middle'
+        #     else:
+        #         return 'start'
+        # elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
+        #     return 'middle'
+        # elif (opponents[0] >= 8 or opponents[1] >= 8):
+        #     return 'end'
+        # else:
+        #     return 'almost over'
         opponents = [self.remaining[(self.mypos + 1) % 4], self.remaining[(self.mypos + 3) % 4]]
         #teammate = self.remaining[(self.mypos + 2) % 4]
         myself = len(message['handCards'])
         
-        if opponents[0] >= 19 and opponents[1] >= 19:
-            if myself <= 10:
-                return 'end'
-            elif myself < 19 and myself > 10:
-                return 'middle'
-            else:
+        if opponents[0] == 0 and opponents[1] > 0:
+            if opponents[1] >= 19:
                 return 'start'
-        elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
-            return 'middle'
-        elif (opponents[0] >= 8 or opponents[1] >= 8):
-            return 'end'
+            elif opponents[1] >= 13:
+                return 'middle'
+            elif opponents[1] >= 8:
+                return 'end'
+            else:
+                return 'almost over'
+        elif opponents[1] == 0 and opponents[0] > 0:
+            if opponents[0] >= 19:
+                return 'start'
+            elif opponents[0] >= 13:
+                return 'middle'
+            elif opponents[0] >= 8:
+                return 'end'
+            else:
+                return 'almost over'
         else:
-            return 'almost over'
+            if opponents[0] >= 19 and opponents[1] >= 19:
+                if myself <= 10:
+                    return 'end'
+                elif myself < 19 and myself > 10:
+                    return 'middle'
+                else:
+                    return 'start'
+            elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
+                return 'middle'
+            elif (opponents[0] >= 8 or opponents[1] >= 8):
+                return 'end'
+            else:
+                return 'almost over'
     
     def penalty_for_bomb(self, message):
         num_legal_actions = message['indexRange'] + 1
@@ -476,24 +512,25 @@ class ExampleClient(WebSocketClient):
             action = message['actionList'][i]
             if action[0] != 'PASS':
                 if message['greaterPos'] == (self.mypos + 2) % 4:
-                    addition[i] -= 0.35
+                    addition[i] -= 0.3
                 if len(action[2]) == len(message['handCards']):
-                    addition[i] += 0.7
-                for opponent in opponents:
+                    addition[i] += 0.9
+                for j in range(2):
+                    opponent = opponents[j]
                     if opponent == 1 and action[0] != 'Single':
-                        addition[i] += 0.3
+                        addition[i] += (0.2 - j * 0.1)
                     elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
-                        addition[i] += 0.2
+                        addition[i] += (0.15 - j * 0.1)
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        addition[i] += 0.2
+                        addition[i] += (0.15 - j * 0.1)
                     elif opponent == 4 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        addition[i] += 0.2
+                        addition[i] += (0.15 - j * 0.1)
                         if (action[0] == 'Bomb' and len(action[2]) >= 4 or action[0] == 'StraightFlush'):
-                            addition[i] += 0.2
+                            addition[i] += (0.15 - j * 0.1)
                     elif opponent == 5 and not (action[0] in ['Single', 'Pair', 'Trips', 'Straight', 'StraightFlush', 'ThreeWithTwo']) \
                         or (action[0] == 'Bomb' and len(action[2]) >= 5 or (len(action[2]) == 4 and 'SB' in action[2])) \
                         or (action[0] == 'StraightFlush'):
-                        addition[i] += 0.2
+                        addition[i] += (0.15 - j * 0.1)
             bomb_size = None
             if action[0] == 'Bomb':
                 bomb_size = len(action[2])
