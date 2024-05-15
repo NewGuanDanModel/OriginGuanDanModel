@@ -557,10 +557,10 @@ class ExampleClient(WebSocketClient):
         unique_single_cards = [
             card for card in single if card not in cards_in_straights]
         unique_card_sizes = set(card[1:] for card in pairs)
-        penalty_value = 1.8 * len(unique_single_cards) + (len(single) -
-                                                          len(unique_single_cards)) + 0.5 * len(unique_card_sizes)
-        # 这里我们设定penalty_value < 5即为较好
-        penalty_weight = math.log(penalty_value) / math.log(5)
+        penalty_value = 3 + 1.8 * \
+            len(unique_single_cards) + 1.2 * len(unique_card_sizes)
+        # 这里我们设定penalty_value < 6即为较好
+        penalty_weight = math.log(penalty_value) / math.log(6)
 
         num_legal_actions = message['indexRange'] + 1
         situation = self.current_situation(message)
@@ -575,14 +575,14 @@ class ExampleClient(WebSocketClient):
                     elif situation == 'middle':
                         penalty[i] -= 0.2 * penalty_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.3 * penalty_weight
+                        penalty[i] += 0.3 / penalty_weight
                 elif action[0] == 'StraightFlush':
                     if situation == 'start':
                         penalty[i] -= 1.0 * penalty_weight
                     elif situation == 'middle':
                         penalty[i] -= 0.1 * penalty_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.5 * penalty_weight
+                        penalty[i] += 0.5 / penalty_weight
                 for card in action[2]:
                     if card == level_card:
                         if situation == 'start':
