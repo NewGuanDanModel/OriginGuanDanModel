@@ -5,11 +5,13 @@ from argparse import ArgumentParser
 from functools import reduce
 from random import randint
 from time import sleep
+from collections import Counter, OrderedDict
+import math
 
 import numpy as np
 import zmq
 from pyarrow import deserialize, serialize
-from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation, get_power_of_action, STATE_NUM
+from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation
 from ws4py.client.threadedclient import WebSocketClient
 
 warnings.filterwarnings("ignore")
@@ -123,6 +125,64 @@ def getlist(handcards, rank):
         straight_actionlist.sort(key=mysort1)
 
     return single_actionlist + pair_actionlist + trips_actionlist + threepair_actionlist + threetwo_actionlist + twotrips_actionlist + straight_actionlist
+
+def get_info_for_penalty(handcards, rank):
+    single_cards = []
+    pairs = []
+
+    card_value_s2v = {"2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "J": 11,
+                      "Q": 12, "K": 13, "A": 14, "B": 16, "R": 17}
+    card_value_s2v2 = {"A": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "J": 11,
+                       "Q": 12, "K": 13, "B": 16, "R": 17}
+    rank_card = 'H' + str(rank)
+    card_value_s2v[rank_card[-1]] = 15
+
+    # Remove the larger card
+    remove_list = [rank_card[-1], 'B', 'R']
+
+    sorted_handCards = sorted(
+        handcards, key=lambda card: card_value_s2v[card[1]])
+
+    card_counts = Counter(card[1:] for card in sorted_handCards)
+
+    # Search all 'single'
+    single_cards = [
+        card for card in sorted_handCards if card_counts[card[1:]] == 1]
+
+    # Search all 'pairs'
+    pairs = [card for card in sorted_handCards if card_counts[card[1:]] == 2]
+    pairs = list(OrderedDict.fromkeys(pairs))
+
+    sorted_handCards_straight = sorted(
+        handcards, key=lambda card: card_value_s2v2[card[1]])
+
+    def find_straights(sorted_handCards_straight, min_length=5):
+        if not sorted_handCards_straight:
+            return []
+        straights = []
+        current_straight = [sorted_handCards_straight[0]]
+
+        for i in range(1, len(sorted_handCards_straight)):
+            if sorted_handCards_straight[i][1:] == sorted_handCards_straight[i - 1][1:]:
+                continue
+            if card_value_s2v2[sorted_handCards_straight[i][1:]] == card_value_s2v2[current_straight[-1][1:]] + 1:
+                current_straight.append(sorted_handCards_straight[i])
+            else:
+                if len(current_straight) >= min_length:
+                    straights.append(current_straight)
+                current_straight = [sorted_handCards_straight[i]]
+
+        if len(current_straight) >= min_length:
+            straights.append(current_straight)
+        return straights
+
+    single_cards = [
+        card for card in single_cards if card[1:] not in remove_list]
+    pairs = [card for card in pairs if card[1:] not in remove_list]
+    return single_cards, pairs, find_straights(sorted_handCards_straight, min_length=5)
+###
+
+
 
 class ExampleClient(WebSocketClient):
     def __init__(self, url, args):
@@ -416,48 +476,35 @@ class ExampleClient(WebSocketClient):
         #teammate = self.remaining[(self.mypos + 2) % 4]
         myself = len(message['handCards'])
         
-        if opponents[0] == 0 and opponents[1] > 0:
-            if opponents[1] >= STATE_NUM[0]:
-                return 'start'
-            elif opponents[1] >= STATE_NUM[1]:
-                return 'middle'
-            elif opponents[1] >= STATE_NUM[2]:
+        if opponents[0] >= 19 and opponents[1] >= 19:
+            if myself <= 10:
                 return 'end'
-            else:
-                return 'almost over'
-        elif opponents[1] == 0 and opponents[0] > 0:
-            if opponents[0] >= STATE_NUM[0]:
-                return 'start'
-            elif opponents[0] >= STATE_NUM[1]:
+            elif myself < 19 and myself > 10:
                 return 'middle'
-            elif opponents[0] >= STATE_NUM[2]:
-                return 'end'
             else:
-                return 'almost over'
+                return 'start'
+        elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
+            return 'middle'
+        elif (opponents[0] >= 8 or opponents[1] >= 8):
+            return 'end'
         else:
-            if opponents[0] >= STATE_NUM[0] and opponents[1] >= STATE_NUM[0]:
-                if myself < STATE_NUM[1]:
-                    return 'end'
-                elif myself < STATE_NUM[0] and myself >= STATE_NUM[1]:
-                    return 'middle'
-                else:
-                    return 'start'
-            elif (opponents[0] < STATE_NUM[0] and opponents[0] >= STATE_NUM[1] and opponents[1] >= STATE_NUM[1]) or (opponents[1] < STATE_NUM[0] and opponents[1] >= STATE_NUM[1] and opponents[0] >= STATE_NUM[1]):
-                if myself >= STATE_NUM[0]:
-                    return 'start'
-                elif myself >= STATE_NUM[1]:
-                    return 'middle'
-                else:
-                    return 'end'
-            elif (opponents[0] >= STATE_NUM[2] or opponents[1] >= STATE_NUM[2]):
-                if myself >= STATE_NUM[1]:
-                    return 'middle'
-                else:
-                    return 'end'
-            else:
-                return 'almost over'
+            return 'almost over'
     
-    def penalty_for_bomb(self, message):
+    def penalty_for_bomb(self, handcards, message):
+
+        single, pairs, straights = get_info_for_penalty(
+            handcards, self.current_rank)
+        cards_in_straights = set(
+            card for straight in straights for card in straight)
+        # 找出在单张中但不在顺子中的牌
+        unique_single_cards = [
+            card for card in single if card not in cards_in_straights]
+        unique_card_sizes = set(card[1:] for card in pairs)
+        penalty_value = 1.8 * len(unique_single_cards) + (len(single) -
+                                                          len(unique_single_cards)) + 0.5 * len(unique_card_sizes)
+        # 这里我们设定penalty_value < 5即为较好
+        penalty_weight = math.log(penalty_value) / math.log(5)
+
         num_legal_actions = message['indexRange'] + 1
         situation = self.current_situation(message)
         penalty = [0] * num_legal_actions
@@ -465,17 +512,20 @@ class ExampleClient(WebSocketClient):
         for i in range(num_legal_actions):
             action = message['actionList'][i]
             if action[0] != 'PASS':
-                if action[0] == 'Bomb' or action[0] == 'StraightFlush':
+                if action[0] == 'Bomb':
                     if situation == 'start':
-                        penalty[i] -= 0.8
-                        if action[0] == 'StraightFlush':
-                            penalty[i] -= 0.4
+                        penalty[i] -= 0.8 * penalty_weight
                     elif situation == 'middle':
-                        penalty[i] -= 0.2
-                        if action[0] == 'StraightFlush':
-                            penalty[i] -= 0.2
+                        penalty[i] -= 0.2 * penalty_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.3
+                        penalty[i] += 0.3 * penalty_weight
+                elif action[0] == 'StraightFlush':
+                    if situation == 'start':
+                        penalty[i] -= 1.0 * penalty_weight
+                    elif situation == 'middle':
+                        penalty[i] -= 0.1 * penalty_weight
+                    elif situation == 'almost over':
+                        penalty[i] += 0.5 * penalty_weight
                 for card in action[2]:
                     if card == level_card:
                         if situation == 'start':
@@ -495,41 +545,24 @@ class ExampleClient(WebSocketClient):
             action = message['actionList'][i]
             if action[0] != 'PASS':
                 if message['greaterPos'] == (self.mypos + 2) % 4:
-                    addition[i] -= 0.3
+                    addition[i] -= 0.35
                 if len(action[2]) == len(message['handCards']):
-                    addition[i] += 0.9
-                for j in range(2):
-                    opponent = opponents[j]
+                    addition[i] += 0.7
+                for opponent in opponents:
                     if opponent == 1 and action[0] != 'Single':
-                        if action[0] == 'Bomb' or action[0] == 'StraightFlush':
-                            addition[i] += 0.5
-                        else:
-                            addition[i] += (0.2 - j * 0.1)
-                    elif opponent == 2:
-                        if action[0] == 'Single':
-                            addition[i] += (-0.2 + get_power_of_action(action, self.current_rank) * 0.035)
-                        elif action[0] != 'Pair':
-                            if action[0] == 'Bomb' or action[0] == 'StraightFlush':
-                                addition[i] += 0.5
-                            else:
-                                addition[i] += (0.15 - j * 0.1)
+                        addition[i] += 0.3
+                    elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
+                        addition[i] += 0.2
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        if action[0] == 'Bomb' or action[0] == 'StraightFlush':
-                            addition[i] += 0.5
-                        else:
-                            addition[i] += (0.2 - j * 0.1)
+                        addition[i] += 0.2
                     elif opponent == 4 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        addition[i] += (0.15 - j * 0.1)
+                        addition[i] += 0.2
                         if (action[0] == 'Bomb' and len(action[2]) >= 4 or action[0] == 'StraightFlush'):
-                            addition[i] += 0.5
-                            if action[0] == 'StraightFlush':
-                                addition[i] += 0.2
+                            addition[i] += 0.2
                     elif opponent == 5 and not (action[0] in ['Single', 'Pair', 'Trips', 'Straight', 'StraightFlush', 'ThreeWithTwo']) \
                         or (action[0] == 'Bomb' and len(action[2]) >= 5 or (len(action[2]) == 4 and 'SB' in action[2])) \
                         or (action[0] == 'StraightFlush'):
-                        addition[i] += 0.35
-                        if action[0] == 'StraightFlush' or action[0] == 'Bomb' and (action[1] == 'JOKER' or len(action[2]) >= 5):
-                            addition[i] += 0.2
+                        addition[i] += 0.2
             bomb_size = None
             if action[0] == 'Bomb':
                 bomb_size = len(action[2])
