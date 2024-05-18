@@ -11,7 +11,7 @@ import math
 import numpy as np
 import zmq
 from pyarrow import deserialize, serialize
-from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation
+from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation, STATE_NUM
 from ws4py.client.threadedclient import WebSocketClient
 
 warnings.filterwarnings("ignore")
@@ -509,41 +509,48 @@ class ExampleClient(WebSocketClient):
         return res
 
     def current_situation(self, message):
-        opponents = [self.remaining[(self.mypos + 1) %
-                                    4], self.remaining[(self.mypos + 3) % 4]]
-        # teammate = self.remaining[(self.mypos + 2) % 4]
+        opponents = [self.remaining[(self.mypos + 1) % 4], self.remaining[(self.mypos + 3) % 4]]
+        #teammate = self.remaining[(self.mypos + 2) % 4]
         myself = len(message['handCards'])
-
+        
         if opponents[0] == 0 and opponents[1] > 0:
-            if opponents[1] >= 19:
+            if opponents[1] >= STATE_NUM[0]:
                 return 'start'
-            elif opponents[1] >= 13:
+            elif opponents[1] >= STATE_NUM[1]:
                 return 'middle'
-            elif opponents[1] >= 8:
+            elif opponents[1] >= STATE_NUM[2]:
                 return 'end'
             else:
                 return 'almost over'
         elif opponents[1] == 0 and opponents[0] > 0:
-            if opponents[0] >= 19:
+            if opponents[0] >= STATE_NUM[0]:
                 return 'start'
-            elif opponents[0] >= 13:
+            elif opponents[0] >= STATE_NUM[1]:
                 return 'middle'
-            elif opponents[0] >= 8:
+            elif opponents[0] >= STATE_NUM[2]:
                 return 'end'
             else:
                 return 'almost over'
         else:
-            if opponents[0] >= 19 and opponents[1] >= 19:
-                if myself <= 10:
+            if opponents[0] >= STATE_NUM[0] and opponents[1] >= STATE_NUM[0]:
+                if myself < STATE_NUM[1]:
                     return 'end'
-                elif myself < 19 and myself > 10:
+                elif myself < STATE_NUM[0] and myself >= STATE_NUM[1]:
                     return 'middle'
                 else:
                     return 'start'
-            elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
-                return 'middle'
-            elif (opponents[0] >= 8 or opponents[1] >= 8):
-                return 'end'
+            elif (opponents[0] < STATE_NUM[0] and opponents[0] >= STATE_NUM[1] and opponents[1] >= STATE_NUM[1]) or (opponents[1] < STATE_NUM[0] and opponents[1] >= STATE_NUM[1] and opponents[0] >= STATE_NUM[1]):
+                if myself >= STATE_NUM[0]:
+                    return 'start'
+                elif myself >= STATE_NUM[1]:
+                    return 'middle'
+                else:
+                    return 'end'
+            elif (opponents[0] >= STATE_NUM[2] or opponents[1] >= STATE_NUM[2]):
+                if myself >= STATE_NUM[1]:
+                    return 'middle'
+                else:
+                    return 'end'
             else:
                 return 'almost over'
 
@@ -653,7 +660,10 @@ class ExampleClient(WebSocketClient):
             if level_score == 0:
                 pass
             else:
-                addition[i] += level_score[action[1]]
+                try:
+                    addition[i] += level_score[action[1]]
+                except KeyError as e:
+                    print(action[1])
         return addition
     ##################
 
