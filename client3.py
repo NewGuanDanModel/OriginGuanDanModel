@@ -530,17 +530,18 @@ class ExampleClient(WebSocketClient):
         team = [self.mypos, (self.mypos + 2) % 4]
         opponents = [(self.mypos + 2) % 4, (self.mypos + 2) % 4]
         cal_num = 0
-        for i in range(-3, 0):
-            if self.action_order[i] in opponents:
-                cal_num += 1
-            elif self.action_order[i] in team:
-                cal_num = 0
+        if len(self.action_order) >= 3:
+            for i in range(-3, 0):
+                if self.action_order[i] in opponents:
+                    cal_num += 1
+                elif self.action_order[i] in team:
+                    cal_num = 0
         return max(1, cal_num)
 
-    def penalty_for_bomb(self, handcards, message):
+    def penalty_for_bomb(self, message):
         add_weight = self.card_status()
         single, pairs, straights = get_info_for_penalty(
-            handcards, self.current_rank)
+            message['handCards'], self.current_rank)
         cards_in_straights = set(
             card for straight in straights for card in straight)
         # 找出在单张中但不在顺子中的牌
@@ -585,6 +586,8 @@ class ExampleClient(WebSocketClient):
 
     # modified
     def addition_for_action(self, message):
+        useless_list = ['2', '3', '4', '5', '6', '7', '8', '9', 'T']
+        rank_card = 'H' + str(self.current_rank)
         add_weight = self.card_status()
         num_legal_actions = message['indexRange'] + 1
         addition = [0] * num_legal_actions
@@ -598,9 +601,13 @@ class ExampleClient(WebSocketClient):
                     addition[i] -= 0.35
                 if len(action[2]) == len(message['handCards']):
                     addition[i] += 0.7
+                if action[0] in ['Single', 'Pair'] and action[2][0][1] in useless_list and action[2][0][1] != str(self.current_rank):
+                    addition[i] += 0.5
+                if action[0] in ['Single', 'Pair', 'Trips', 'ThreeWithTwo'] and rank_card in action[2]:
+                    addition[i] -= 3
                 for opponent in opponents:
                     if opponent == 1 and action[0] != 'Single':
-                        addition[i] += 0.3 * add_weight
+                        addition[i] += 0.7 * add_weight
                     elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
                         addition[i] += 0.2 * add_weight
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
@@ -625,7 +632,7 @@ class ExampleClient(WebSocketClient):
             else:
                 addition[i] += level_score[action[1]]
         return addition
-        #############
+    ##################
 
     def prepare(self, message):
         num_legal_actions = message['indexRange'] + 1
