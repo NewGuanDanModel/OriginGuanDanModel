@@ -547,8 +547,22 @@ class ExampleClient(WebSocketClient):
             else:
                 return 'almost over'
 
-    def penalty_for_bomb(self, handcards, message):
+    # modified by Easton
+    # 对方下一步无事发生，对方连下两步需要考虑压制
+    def card_status(self):
+        team = [self.mypos, (self.mypos + 2) % 4]
+        opponents = [(self.mypos + 2) % 4, (self.mypos + 2) % 4]
+        cal_num = 0
+        for i in range(-3, 0):
+            if self.action_order[i] in opponents:
+                cal_num += 1
+            elif self.action_order[i] in team:
+                cal_num = 0
+        return max(1, cal_num)
+    ###
 
+    def penalty_for_bomb(self, handcards, message):
+        add_weight = self.card_status()
         single, pairs, straights = get_info_for_penalty(
             handcards, self.current_rank)
         cards_in_straights = set(
@@ -556,9 +570,9 @@ class ExampleClient(WebSocketClient):
         # 找出在单张中但不在顺子中的牌
         unique_single_cards = [
             card for card in single if card not in cards_in_straights]
-        unique_card_sizes = set(card[1:] for card in pairs)
+        unique_pairs_cards = set(card[1:] for card in pairs)
         penalty_value = 3 + 1.8 * \
-            len(unique_single_cards) + 1.2 * len(unique_card_sizes)
+            len(unique_single_cards) + 1.2 * len(unique_pairs_cards)
         # 这里我们设定penalty_value < 6即为较好
         penalty_weight = math.log(penalty_value) / math.log(6)
 
@@ -571,18 +585,18 @@ class ExampleClient(WebSocketClient):
             if action[0] != 'PASS':
                 if action[0] == 'Bomb':
                     if situation == 'start':
-                        penalty[i] -= 0.8 * penalty_weight
+                        penalty[i] -= 0.8 * penalty_weight / add_weight
                     elif situation == 'middle':
-                        penalty[i] -= 0.2 * penalty_weight
+                        penalty[i] -= 0.2 * penalty_weight / add_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.3 / penalty_weight
+                        penalty[i] += 0.3 / penalty_weight * add_weight
                 elif action[0] == 'StraightFlush':
                     if situation == 'start':
-                        penalty[i] -= 1.0 * penalty_weight
+                        penalty[i] -= 1.0 * penalty_weight / add_weight
                     elif situation == 'middle':
-                        penalty[i] -= 0.1 * penalty_weight
+                        penalty[i] -= 0.1 * penalty_weight / add_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.5 / penalty_weight
+                        penalty[i] += 0.5 / penalty_weight * add_weight
                 for card in action[2]:
                     if card == level_card:
                         if situation == 'start':
@@ -593,13 +607,14 @@ class ExampleClient(WebSocketClient):
                             penalty[i] += 0.3
         return penalty
 
+    # modified
     def addition_for_action(self, message):
+        add_weight = self.card_status()
         num_legal_actions = message['indexRange'] + 1
         addition = [0] * num_legal_actions
+        situation = self.current_situation(message)
         opponents = [self.remaining[(self.mypos + 1) %
                                     4], self.remaining[(self.mypos + 3) % 4]]
-        opponent_idx = [(self.mypos + 1) % 4, (self.mypos + 3) % 4]
-        situation = self.current_situation(message)
         for i in range(num_legal_actions):
             action = message['actionList'][i]
             if action[0] != 'PASS':
@@ -609,13 +624,13 @@ class ExampleClient(WebSocketClient):
                     addition[i] += 0.7
                 for opponent in opponents:
                     if opponent == 1 and action[0] != 'Single':
-                        addition[i] += 0.3
+                        addition[i] += 0.3 * add_weight
                     elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
-                        addition[i] += 0.2
+                        addition[i] += 0.2 * add_weight
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        addition[i] += 0.2
+                        addition[i] += 0.2 * add_weight
                     elif opponent == 4 and not (action[0] in ['Single', 'Pair', 'Trips']):
-                        addition[i] += 0.2
+                        addition[i] += 0.2 * add_weight
                         if (action[0] == 'Bomb' and len(action[2]) >= 4 or action[0] == 'StraightFlush'):
                             addition[i] += 0.2
                     elif opponent == 5 and not (action[0] in ['Single', 'Pair', 'Trips', 'Straight', 'StraightFlush', 'ThreeWithTwo']) \
@@ -634,6 +649,7 @@ class ExampleClient(WebSocketClient):
             else:
                 addition[i] += level_score[action[1]]
         return addition
+    ##################
 
     def prepare(self, message):
         num_legal_actions = message['indexRange'] + 1
