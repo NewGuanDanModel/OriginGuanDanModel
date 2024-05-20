@@ -41,7 +41,7 @@ def get_score_by_situation(situation : str, level : str, t : str, bomb_size : Op
     if situation == 'start':
         if t in ['Single', 'Pair']:
             for i in range(size):
-                addition[i] = max(0.1 - i * 0.005, 0.06)
+                addition[i] = max(0.05 - i * 0.01, 0)
         elif t not in ['StraightFlush', 'Bomb']:
             for i in range(size):
                 addition[i] = 0.2 - i * 0.035
