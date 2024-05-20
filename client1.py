@@ -11,7 +11,7 @@ import math
 import numpy as np
 import zmq
 from pyarrow import deserialize, serialize
-from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation
+from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation, STATE_NUM
 from ws4py.client.threadedclient import WebSocketClient
 
 warnings.filterwarnings("ignore")
@@ -515,35 +515,43 @@ class ExampleClient(WebSocketClient):
         myself = len(message['handCards'])
 
         if opponents[0] == 0 and opponents[1] > 0:
-            if opponents[1] >= 19:
+            if opponents[1] >= STATE_NUM[0]:
                 return 'start'
-            elif opponents[1] >= 13:
+            elif opponents[1] >= STATE_NUM[1]:
                 return 'middle'
-            elif opponents[1] >= 8:
+            elif opponents[1] >= STATE_NUM[2]:
                 return 'end'
             else:
                 return 'almost over'
         elif opponents[1] == 0 and opponents[0] > 0:
-            if opponents[0] >= 19:
+            if opponents[0] >= STATE_NUM[0]:
                 return 'start'
-            elif opponents[0] >= 13:
+            elif opponents[0] >= STATE_NUM[1]:
                 return 'middle'
-            elif opponents[0] >= 8:
+            elif opponents[0] >= STATE_NUM[2]:
                 return 'end'
             else:
                 return 'almost over'
         else:
-            if opponents[0] >= 19 and opponents[1] >= 19:
-                if myself <= 10:
+            if opponents[0] >= STATE_NUM[0] and opponents[1] >= STATE_NUM[0]:
+                if myself < STATE_NUM[1]:
                     return 'end'
-                elif myself < 19 and myself > 10:
+                elif myself < STATE_NUM[0] and myself >= STATE_NUM[1]:
                     return 'middle'
                 else:
                     return 'start'
-            elif (opponents[0] < 19 and opponents[0] >= 13 and opponents[1] >= 13) or (opponents[1] < 20 and opponents[1] >= 13 and opponents[0] >= 13):
-                return 'middle'
-            elif (opponents[0] >= 8 or opponents[1] >= 8):
-                return 'end'
+            elif (opponents[0] < STATE_NUM[0] and opponents[0] >= STATE_NUM[1] and opponents[1] >= STATE_NUM[1]) or (opponents[1] < STATE_NUM[0] and opponents[1] >= STATE_NUM[1] and opponents[0] >= STATE_NUM[1]):
+                if myself >= STATE_NUM[0]:
+                    return 'start'
+                elif myself >= STATE_NUM[1]:
+                    return 'middle'
+                else:
+                    return 'end'
+            elif (opponents[0] >= STATE_NUM[2] or opponents[1] >= STATE_NUM[2]):
+                if myself >= STATE_NUM[1]:
+                    return 'middle'
+                else:
+                    return 'end'
             else:
                 return 'almost over'
 
@@ -553,16 +561,20 @@ class ExampleClient(WebSocketClient):
         team = [self.mypos, (self.mypos + 2) % 4]
         opponents = [(self.mypos + 2) % 4, (self.mypos + 2) % 4]
         cal_num = 0
-        if len(self.action_order) >= 3:
-            for i in range(-3, 0):
-                if self.action_order[i] in opponents:
+        length = 10
+        if len(self.action_order) >= 5:
+            for i in range(-5, 0):
+                if self.action_order[i] in opponents and self.action_seq[i] != 'PASS':
+                    length += len(self.action_seq[i])
                     cal_num += 1
-                elif self.action_order[i] in team:
+                elif self.action_order[i] in team and self.action_seq[i] != 'PASS':
+                    length = 10
                     cal_num = 0
-        return max(1, cal_num)
+        return max(1, cal_num), length * 0.12
 
     def penalty_for_bomb(self, message):
-        add_weight = self.card_status()
+        add_weight, length = self.card_status()
+        add_weight = add_weight * length
         single, pairs, straights = get_info_for_penalty(
             message['handCards'], self.current_rank)
         cards_in_straights = set(
@@ -573,8 +585,8 @@ class ExampleClient(WebSocketClient):
         unique_pairs_cards = set(card[1:] for card in pairs)
         penalty_value = 3 + 1.8 * \
             len(unique_single_cards) + 1.2 * len(unique_pairs_cards)
-        # 这里我们设定penalty_value < 6即为较好
-        penalty_weight = math.log(penalty_value) / math.log(6)
+        # 这里我们设定penalty_value < 7即为较好
+        penalty_weight = math.log(penalty_value) / math.log(7)
 
         num_legal_actions = message['indexRange'] + 1
         situation = self.current_situation(message)
@@ -585,18 +597,18 @@ class ExampleClient(WebSocketClient):
             if action[0] != 'PASS':
                 if action[0] == 'Bomb':
                     if situation == 'start':
-                        penalty[i] -= 0.8 * penalty_weight / add_weight
+                        penalty[i] -= (0.8 * penalty_weight) / add_weight
                     elif situation == 'middle':
-                        penalty[i] -= 0.2 * penalty_weight / add_weight
+                        penalty[i] -= (0.2 * penalty_weight) / add_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.3 / penalty_weight * add_weight
+                        penalty[i] += (0.3 / penalty_weight) * add_weight
                 elif action[0] == 'StraightFlush':
                     if situation == 'start':
-                        penalty[i] -= 1.0 * penalty_weight / add_weight
+                        penalty[i] -= (1.0 * penalty_weight) / add_weight
                     elif situation == 'middle':
-                        penalty[i] -= 0.1 * penalty_weight / add_weight
+                        penalty[i] -= (0.5 * penalty_weight) / add_weight
                     elif situation == 'almost over':
-                        penalty[i] += 0.5 / penalty_weight * add_weight
+                        penalty[i] += (0.6 / penalty_weight) * add_weight
                 for card in action[2]:
                     if card == level_card:
                         if situation == 'start':
@@ -609,29 +621,56 @@ class ExampleClient(WebSocketClient):
 
     # modified
     def addition_for_action(self, message):
-        useless_list = ['2', '3', '4', '5', '6', '7', '8', '9', 'T']
-        rank_card = 'H' + str(self.current_rank)
-        add_weight = self.card_status()
+        useless_dict = {'2': 0.9, '3': 0.8, '4': 0.7, '5': 0.6,
+                        '6': 0.5, '7': 0.4, '8': 0.3, '9': 0.2, 'T': 0.1}
+        rank_card = f'H{RANK_INVERSE[self.current_rank]}'
+        useful_list = [rank_card, 'SB', 'HR']
+        add_weight, _ = self.card_status()
         num_legal_actions = message['indexRange'] + 1
         addition = [0] * num_legal_actions
         situation = self.current_situation(message)
         opponents = [self.remaining[(self.mypos + 1) %
                                     4], self.remaining[(self.mypos + 3) % 4]]
+        teammate = self.remaining[(self.mypos + 2) % 4]
+
+        single, pairs, straights = get_info_for_penalty(
+            message['handCards'], self.current_rank)
+
         for i in range(num_legal_actions):
             action = message['actionList'][i]
             if action[0] != 'PASS':
                 if message['greaterPos'] == (self.mypos + 2) % 4:
                     addition[i] -= 0.35
-                if len(action[2]) == len(message['handCards']):
-                    addition[i] += 0.7
-                if action[0] in ['Single', 'Pair'] and action[2][0][1] in useless_list and action[2][0][1] != str(self.current_rank):
-                    addition[i] += 0.5
-                if action[0] in ['Single', 'Pair', 'Trips', 'ThreeWithTwo'] and rank_card in action[2]:
+
+                for j in range(0, 3):
+                    if len(action[2]) == len(message['handCards']) - j:
+                        addition[i] += (0.35 - 0.07 * j)
+
+                if action[0] in ['Single'] and action[2][0] in pairs:
                     addition[i] -= 3
+
+                if action[0] in ['Single'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                    addition[i] += 0.15 * (1 + useless_dict[action[2][0][1]])
+                elif action[0] in ['Pair'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                    addition[i] += 0.30 * (1 + useless_dict[action[2][0][1]])
+                for j in range(0, 3):
+                    if action[0] in ['Trips', 'ThreeWithTwo'] and useful_list[j] in action[2]:
+                        addition[i] -= 3.5
+
+                if teammate == 1 and action[0] == 'Single' and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                    addition[i] += 1.0 * add_weight * \
+                        (1 + useless_dict[action[2][0][1]])
+                elif teammate == 2 and (action[0] in ['Single', 'Pair']):
+                    addition[i] += 0.4 * add_weight
+                elif teammate == 3 and (action[0] in ['Single', 'Pair', 'Trips']):
+                    addition[i] += 0.2 * add_weight
+
                 for opponent in opponents:
                     if opponent == 1 and action[0] != 'Single':
-                        addition[i] += 0.7 * add_weight
+                        addition[i] += 1.0 * add_weight
                     elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
+                        addition[i] += 0.2 * add_weight
+                    elif opponent == 2 and (action[2] in [['SB', 'SB'], ['HR', 'HR']]):
                         addition[i] += 0.2 * add_weight
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
                         addition[i] += 0.2 * add_weight
@@ -647,7 +686,7 @@ class ExampleClient(WebSocketClient):
             if action[0] == 'Bomb':
                 bomb_size = len(action[2])
             elif action[0] == 'StraightFlush':
-                bomb_size == 5
+                bomb_size = 5
             level_score = get_score_by_situation(
                 situation, RANK_INVERSE[self.current_rank], action[0], bomb_size)
             if level_score == 0:
