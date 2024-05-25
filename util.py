@@ -4,31 +4,52 @@ from typing import Optional, List
 import numpy as np
 
 LevelToNum = {
-    '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, 'T': 9, 'J': 10, 'Q': 11, 'K': 12, 'A': 13, 'B' : 14, 'R' : 15, 'JOKER' : 16
+    '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, 'T': 9, 'J': 10, 'Q': 11, 'K': 12, 'A': 13, 'B': 14, 'R': 15, 'JOKER': 16
 }
 
 CardToNum = {
-    'H2':0, 'H3':1, 'H4':2, 'H5':3, 'H6':4, 'H7':5, 'H8':6, 'H9':7, 'HT':8, 'HJ':9, 'HQ':10, 'HK':11, 'HA':12,
-    'S2':13, 'S3':14, 'S4':15, 'S5':16, 'S6':17, 'S7':18, 'S8':19, 'S9':20, 'ST':21, 'SJ':22, 'SQ':23, 'SK':24, 'SA':25,
-    'C2':26, 'C3':27, 'C4':28, 'C5':29, 'C6':30, 'C7':31, 'C8':32, 'C9':33, 'CT':34, 'CJ':35, 'CQ':36, 'CK':37, 'CA':38,
-    'D2':39, 'D3':40, 'D4':41, 'D5':42, 'D6':43, 'D7':44, 'D8':45, 'D9':46, 'DT':47, 'DJ':48, 'DQ':49, 'DK':50, 'DA':51,
-    'SB':52, 'HR':53
+    'H2': 0, 'H3': 1, 'H4': 2, 'H5': 3, 'H6': 4, 'H7': 5, 'H8': 6, 'H9': 7, 'HT': 8, 'HJ': 9, 'HQ': 10, 'HK': 11, 'HA': 12,
+    'S2': 13, 'S3': 14, 'S4': 15, 'S5': 16, 'S6': 17, 'S7': 18, 'S8': 19, 'S9': 20, 'ST': 21, 'SJ': 22, 'SQ': 23, 'SK': 24, 'SA': 25,
+    'C2': 26, 'C3': 27, 'C4': 28, 'C5': 29, 'C6': 30, 'C7': 31, 'C8': 32, 'C9': 33, 'CT': 34, 'CJ': 35, 'CQ': 36, 'CK': 37, 'CA': 38,
+    'D2': 39, 'D3': 40, 'D4': 41, 'D5': 42, 'D6': 43, 'D7': 44, 'D8': 45, 'D9': 46, 'DT': 47, 'DJ': 48, 'DQ': 49, 'DK': 50, 'DA': 51,
+    'SB': 52, 'HR': 53
 }
 
 CardToStr = {
-    'H2':"红桃2", 'H3':"红桃3", 'H4':"红桃4", 'H5':"红桃5", 'H6':"红桃6", 'H7':"红桃7", 'H8':"红桃8", 'H9':"红桃9", 'HT':"红桃10", 'HJ':"红桃J", 'HQ':"红桃Q", 'HK':"红桃K", 'HA':"红桃A",
-    'S2':"黑桃2", 'S3':"黑桃3", 'S4':"黑桃4", 'S5':"黑桃5", 'S6':"黑桃6", 'S7':"黑桃7", 'S8':"黑桃8", 'S9':"黑桃9", 'ST':"黑桃10", 'SJ':"黑桃J", 'SQ':"黑桃Q", 'SK':"黑桃K", 'SA':"黑桃A",
-    'C2':"梅花2", 'C3':"梅花3", 'C4':"梅花4", 'C5':"梅花5", 'C6':"梅花6", 'C7':"梅花7", 'C8':"梅花8", 'C9':"梅花9", 'CT':"梅花10", 'CJ':"梅花J", 'CQ':"梅花Q", 'CK':"梅花K", 'CA':"梅花A",
-    'D2':"方块2", 'D3':"方块3", 'D4':"方块4", 'D5':"方块5", 'D6':"方块6", 'D7':"方块7", 'D8':"方块8", 'D9':"方块9", 'DT':"方块10", 'DJ':"方块J", 'DQ':"方块Q", 'DK':"方块K", 'DA':"方块A",
-    'SB':"小王", 'HR':"大王"
+    'H2': "红桃2", 'H3': "红桃3", 'H4': "红桃4", 'H5': "红桃5", 'H6': "红桃6", 'H7': "红桃7", 'H8': "红桃8", 'H9': "红桃9", 'HT': "红桃10", 'HJ': "红桃J", 'HQ': "红桃Q", 'HK': "红桃K", 'HA': "红桃A",
+    'S2': "黑桃2", 'S3': "黑桃3", 'S4': "黑桃4", 'S5': "黑桃5", 'S6': "黑桃6", 'S7': "黑桃7", 'S8': "黑桃8", 'S9': "黑桃9", 'ST': "黑桃10", 'SJ': "黑桃J", 'SQ': "黑桃Q", 'SK': "黑桃K", 'SA': "黑桃A",
+    'C2': "梅花2", 'C3': "梅花3", 'C4': "梅花4", 'C5': "梅花5", 'C6': "梅花6", 'C7': "梅花7", 'C8': "梅花8", 'C9': "梅花9", 'CT': "梅花10", 'CJ': "梅花J", 'CQ': "梅花Q", 'CK': "梅花K", 'CA': "梅花A",
+    'D2': "方块2", 'D3': "方块3", 'D4': "方块4", 'D5': "方块5", 'D6': "方块6", 'D7': "方块7", 'D8': "方块8", 'D9': "方块9", 'DT': "方块10", 'DJ': "方块J", 'DQ': "方块Q", 'DK': "方块K", 'DA': "方块A",
+    'SB': "小王", 'HR': "大王"
 }
 
 STATE_NUM = [20, 13, 7]
 
-def get_score_by_situation(situation : str, level : str, t : str, bomb_size : Optional[int]):
+
+def find_element_occurred_twice(cards):
+    # 创建一个字典来计数每个元素的出现次数
+    count = {}
+
+    # 遍历牌的列表，统计每个元素的出现次数
+    for card in cards:
+        if card in count:
+            count[card] += 1
+        else:
+            count[card] = 1
+
+    # 检查哪些元素出现了两次
+    for key in count:
+        if count[key] == 2:
+            return key[-1]  # 返回出现两次的元素的最后一个字符
+
+    return None  # 如果没有找到符合条件的元素，则返回 None
+
+
+def get_score_by_situation(situation: str, level: str, t: str, bomb_size: Optional[int]):
     if t == "PASS":
         return 0
-    origin_rank = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A', 'B', 'R', 'JOKER']
+    origin_rank = ['2', '3', '4', '5', '6', '7', '8',
+                   '9', 'T', 'J', 'Q', 'K', 'A', 'B', 'R', 'JOKER']
     if not (t in ['Straight', 'StraightFlush', 'ThreePair', 'TwoTrips']):
         idx = origin_rank.index(level)
         origin_rank.pop(idx)
@@ -62,7 +83,8 @@ def get_score_by_situation(situation : str, level : str, t : str, bomb_size : Op
                 addition[i] = min(i * 0.02, 0.12)
     return dict(zip(origin_rank, addition))
 
-def get_power_of_action(action : List, level : int) -> int:
+
+def get_power_of_action(action: List, level: int) -> int:
     power = action[1]
     t = action[0]
     if t not in ['Straight', 'StraightFlush', 'TwoTrips', 'ThreePair']:
@@ -77,27 +99,30 @@ def get_power_of_action(action : List, level : int) -> int:
     else:
         return LevelToNum[power]
 
+
 def card2num(list_cards):      # 将字符串转换成数字
-    res = []   
+    res = []
     if list_cards == None:
         return res
     if list_cards == -1:
-        return [-1] 
+        return [-1]
     for ele in list_cards:
         if ele in CardToNum:
             res.append(CardToNum[ele])
     return res
 
+
 def card2str(list_cards) -> list:
-    res = []   
+    res = []
     if list_cards == None:
         return res
     if list_cards == -1:
-        return [-1] 
+        return [-1]
     for ele in list_cards:
         if ele in CardToStr:
             res.append(CardToStr[ele])
     return res
+
 
 def card2array(list_cards):
     if len(list_cards) == 0:
@@ -117,6 +142,7 @@ def card2array(list_cards):
         elif card == 53:
             jokers[1] = num_times
     return np.concatenate((matrix.flatten('F'), jokers))
+
 
 def combine_handcards(handcards, rank, card_val):
     cards = {}
@@ -152,9 +178,9 @@ def combine_handcards(handcards, rank, card_val):
                 temp.remove(j)
     cardre = [0] * 14
     cardre_value_s2v = {"A": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "J": 11,
-                       "Q": 12, "K": 13}
+                        "Q": 12, "K": 13}
     for i in temp:
-        cardre[cardre_value_s2v[i[-1]]] +=1
+        cardre[cardre_value_s2v[i[-1]]] += 1
     st = []
     minnum = 10
     mintwonum = 10
