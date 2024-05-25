@@ -426,7 +426,7 @@ class ExampleClient(WebSocketClient):
             
             with open('human_vs_model.log', 'a+') as f:
                 f.write(f"========================\n")
-                f.write(f"human vs train20/24500\n")
+                f.write(f"steven vs train20/24500\n")
                 value = 0.0
                 d = 1.0
                 for item in self.tongji.items():
@@ -446,7 +446,7 @@ class ExampleClient(WebSocketClient):
         #     # print('胜局统计', message['victoryNum'], file=resfile)
         #     print('胜局统计', message['victoryNum'])
         #     # print(self.tongji, file=resfile)
-            with open('res.log', 'a+') as f:
+            with open('steven.log', 'a+') as f:
                 f.write("--------------------\n")
                 f.write(f"胜局统计{message['victoryNum']}\n")
                 f.write(f"{self.tongji}\n")
