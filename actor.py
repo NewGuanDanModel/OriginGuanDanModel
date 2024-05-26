@@ -58,10 +58,6 @@ class Player():
             return 0
         for i in range(size):
             output[i] += state['addition'][i] + state['penalty'][i]
-        # top_2_indices = self.find_top_k_elements_indices(output.copy(), 2)
-        # dummy = exp(output[top_2_indices[0]]) + exp(output[top_2_indices[1]])
-        # weights = np.array([exp(output[top_2_indices[0]]) / dummy, exp(output[top_2_indices[1]]) / dummy],dtype=np.float32)
-        # choice = np.random.choice(top_2_indices, 1, p=weights)[0]
         return np.argmax(output)
     
     def find_top_k_elements_indices(self, array, k : int) -> List[int]:

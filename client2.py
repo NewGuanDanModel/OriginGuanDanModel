@@ -11,7 +11,7 @@ import math
 import numpy as np
 import zmq
 from pyarrow import deserialize, serialize
-from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation, STATE_NUM
+from util import card2array, card2num, combine_handcards, card2str, get_score_by_situation, STATE_NUM, find_element_occurred_twice
 from ws4py.client.threadedclient import WebSocketClient
 
 from action2 import Action2
@@ -565,14 +565,13 @@ class ExampleClient(WebSocketClient):
 
     # modified by Easton
     # 对方下一步无事发生，对方连下两步需要考虑压制
-
     def card_status(self):
         team = [self.mypos, (self.mypos + 2) % 4]
         opponents = [(self.mypos + 2) % 4, (self.mypos + 2) % 4]
         cal_num = 0
         length = 10
-        if len(self.action_order) >= 5:
-            for i in range(-5, 0):
+        if len(self.action_order) >= 7:
+            for i in range(-7, 0):
                 if self.action_order[i] in opponents and self.action_seq[i] != 'PASS':
                     length += len(self.action_seq[i])
                     cal_num += 1
@@ -606,9 +605,12 @@ class ExampleClient(WebSocketClient):
             if action[0] != 'PASS':
                 if action[0] == 'Bomb':
                     if situation == 'start':
-                        penalty[i] -= (0.8 * penalty_weight) / add_weight
+                        if len(action[2]) == 4:
+                            penalty[i] += (0.02 / penalty_weight) * add_weight
+                        else:
+                            penalty[i] -= (0.10 * penalty_weight) / add_weight
                     elif situation == 'middle':
-                        penalty[i] -= (0.2 * penalty_weight) / add_weight
+                        penalty[i] += (0.05 / penalty_weight) * add_weight
                     elif situation == 'almost over':
                         penalty[i] += (0.3 / penalty_weight) * add_weight
                 elif action[0] == 'StraightFlush':
@@ -634,6 +636,7 @@ class ExampleClient(WebSocketClient):
                         '6': 0.5, '7': 0.4, '8': 0.3, '9': 0.2, 'T': 0.1}
         rank_card = f'H{RANK_INVERSE[self.current_rank]}'
         useful_list = [rank_card, 'SB', 'HR']
+        next_best = ['J', 'Q', 'K', 'A', str(self.current_rank)]
         add_weight, _ = self.card_status()
         num_legal_actions = message['indexRange'] + 1
         addition = [0] * num_legal_actions
@@ -661,11 +664,18 @@ class ExampleClient(WebSocketClient):
                 if action[0] in ['Single'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
                     addition[i] += 0.15 * (1 + useless_dict[action[2][0][1]])
                 elif action[0] in ['Pair'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
-                    addition[i] += 0.30 * (1 + useless_dict[action[2][0][1]])
+                    addition[i] += 0.20 * (1 + useless_dict[action[2][0][1]])
+
                 for j in range(0, 3):
-                    if action[0] in ['Trips', 'ThreeWithTwo'] and useful_list[j] in action[2]:
+                    if action[0] in ['ThreeWithTwo'] and useful_list[j] in action[2]:
                         addition[i] -= 3.5
 
+                if action[0] in ['ThreeWithTwo']:
+                    two_attach = find_element_occurred_twice(action[2])
+                    if two_attach in next_best:
+                        addition[i] -= 0.5
+
+                # 打配合让队友走
                 if teammate == 1 and action[0] == 'Single' and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
                     addition[i] += 1.0 * add_weight * \
                         (1 + useless_dict[action[2][0][1]])
@@ -677,9 +687,14 @@ class ExampleClient(WebSocketClient):
                 for opponent in opponents:
                     if opponent == 1 and action[0] != 'Single':
                         addition[i] += 1.0 * add_weight
-                    elif opponent == 2 and not (action[0] in ['Single', 'Pair']):
+                    if opponent == 1 and len(self.action_seq[-1]) == 1 and action[0] == 'Single':
+                        if action[2][0] == 'HR':
+                            addition[i] += 2
+                        elif action[2][0] == 'SB':
+                            addition[i] += 1
+                    if opponent == 2 and not (action[0] in ['Single', 'Pair']):
                         addition[i] += 0.2 * add_weight
-                    elif opponent == 2 and (action[2] in [['SB', 'SB'], ['HR', 'HR']]):
+                    if opponent == 2 and (action[2] in [['SB', 'SB'], ['HR', 'HR']]):
                         addition[i] += 0.2 * add_weight
                     elif opponent == 3 and not (action[0] in ['Single', 'Pair', 'Trips']):
                         addition[i] += 0.2 * add_weight

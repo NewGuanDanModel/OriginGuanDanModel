@@ -424,7 +424,7 @@ class ExampleClient(WebSocketClient):
                 f.write(f"The end sequence is {message['order']}\n")
                 f.close()
             
-            with open('human_vs_model.log', 'a+') as f:
+            with open('steven_vs_danzero.log', 'a+') as f:
                 f.write(f"========================\n")
                 f.write(f"steven vs train20/24500\n")
                 value = 0.0
