@@ -605,9 +605,12 @@ class ExampleClient(WebSocketClient):
             if action[0] != 'PASS':
                 if action[0] == 'Bomb':
                     if situation == 'start':
-                        penalty[i] -= (0.65 * penalty_weight) / add_weight
+                        if len(action[2]) == 4:
+                            penalty[i] += (0.02 / penalty_weight) * add_weight
+                        else:
+                            penalty[i] -= (0.15 * penalty_weight) / add_weight
                     elif situation == 'middle':
-                        penalty[i] -= (0.05 * penalty_weight) / add_weight
+                        penalty[i] += (0.05 / penalty_weight) * add_weight
                     elif situation == 'almost over':
                         penalty[i] += (0.3 / penalty_weight) * add_weight
                 elif action[0] == 'StraightFlush':
@@ -657,16 +660,20 @@ class ExampleClient(WebSocketClient):
 
                 if action[0] in ['Single'] and action[2][0] in pairs:
                     addition[i] -= 3
-
                 if action[0] in ['Single'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
                     addition[i] += 0.15 * (1 + useless_dict[action[2][0][1]])
-                elif action[0] in ['Pair'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
-                    addition[i] += 0.20 * (1 + useless_dict[action[2][0][1]])
+
+                if action[0] in ['Pair']:
+                    card1 = action[2][0]
+                    if card1 not in pairs:
+                        addition[i] -= 2
+                    elif action[0] in ['Pair'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                        addition[i] += 0.18 * \
+                            (1 + useless_dict[action[2][0][1]])
 
                 for j in range(0, 3):
                     if action[0] in ['ThreeWithTwo'] and useful_list[j] in action[2]:
                         addition[i] -= 3.5
-
                 if action[0] in ['ThreeWithTwo']:
                     two_attach = find_element_occurred_twice(action[2])
                     if two_attach in next_best:
