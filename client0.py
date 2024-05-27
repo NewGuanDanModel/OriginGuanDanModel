@@ -424,9 +424,9 @@ class ExampleClient(WebSocketClient):
                 f.write(f"The end sequence is {message['order']}\n")
                 f.close()
             
-            with open('human_vs_model.log', 'a+') as f:
+            with open('steven_vs_guandan.log', 'a+') as f:
                 f.write(f"========================\n")
-                f.write(f"human vs train20/24500\n")
+                f.write(f"steven vs train20/24500\n")
                 value = 0.0
                 d = 1.0
                 for item in self.tongji.items():
@@ -442,10 +442,6 @@ class ExampleClient(WebSocketClient):
         
         # 全部打完
         if message['stage'] == 'gameResult' and message['type'] == 'notify':
-        #     # print('------------------对局结束-------------------')
-        #     # print('胜局统计', message['victoryNum'], file=resfile)
-        #     print('胜局统计', message['victoryNum'])
-        #     # print(self.tongji, file=resfile)
             with open('res.log', 'a+') as f:
                 f.write("--------------------\n")
                 f.write(f"胜局统计{message['victoryNum']}\n")
@@ -460,7 +456,6 @@ class ExampleClient(WebSocketClient):
                 f.write(f"score = {value / d}\n")
                 f.write("--------------------\n\n")
                 f.close()
-        #     # print('------------------对局结束-------------------')
 
     def get_reward(self, message):
         team = [self.mypos, (self.mypos + 2) % 4]
