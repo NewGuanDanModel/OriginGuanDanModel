@@ -566,13 +566,13 @@ class ExampleClient(WebSocketClient):
                 elif self.action_order[i] in team and self.action_seq[i] != 'PASS':
                     length = 10
                     cal_num = 0
-        return max(1, cal_num), length * 0.12
+        return max(1, cal_num), length * 0.13
 
     def penalty_for_bomb(self, message):
         add_weight, length = self.card_status()
         add_weight = add_weight * length
         single, pairs, straights = get_info_for_penalty(
-            message['handCards'], self.current_rank)
+            message['handCards'], RANK_INVERSE[self.current_rank])
         cards_in_straights = set(
             card for straight in straights for card in straight)
         # 找出在单张中但不在顺子中的牌
@@ -624,7 +624,7 @@ class ExampleClient(WebSocketClient):
                         '6': 0.5, '7': 0.4, '8': 0.3, '9': 0.2, 'T': 0.1}
         rank_card = f'H{RANK_INVERSE[self.current_rank]}'
         useful_list = [rank_card, 'SB', 'HR']
-        next_best = ['J', 'Q', 'K', 'A', str(self.current_rank)]
+        next_best = ['J', 'Q', 'K', 'A', RANK_INVERSE[self.current_rank]]
         add_weight, _ = self.card_status()
         num_legal_actions = message['indexRange'] + 1
         addition = [0] * num_legal_actions
@@ -634,7 +634,7 @@ class ExampleClient(WebSocketClient):
         teammate = self.remaining[(self.mypos + 2) % 4]
 
         single, pairs, straights = get_info_for_penalty(
-            message['handCards'], self.current_rank)
+            message['handCards'], RANK_INVERSE[self.current_rank])
 
         for i in range(num_legal_actions):
             action = message['actionList'][i]
@@ -648,14 +648,14 @@ class ExampleClient(WebSocketClient):
 
                 if action[0] in ['Single'] and action[2][0] in pairs:
                     addition[i] -= 3
-                if action[0] in ['Single'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                if action[0] in ['Single'] and action[2][0][1] in useless_dict and action[2][0][1] != RANK_INVERSE[self.current_rank]:
                     addition[i] += 0.15 * (1 + useless_dict[action[2][0][1]])
 
                 if action[0] in ['Pair']:
                     card1 = action[2][0]
                     if card1 not in pairs:
                         addition[i] -= 2
-                    elif action[0] in ['Pair'] and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                    elif action[0] in ['Pair'] and action[2][0][1] in useless_dict and action[2][0][1] != RANK_INVERSE[self.current_rank]:
                         addition[i] += 0.18 * \
                             (1 + useless_dict[action[2][0][1]])
 
@@ -668,7 +668,7 @@ class ExampleClient(WebSocketClient):
                         addition[i] -= 0.5
 
                 # 打配合让队友走
-                if teammate == 1 and action[0] == 'Single' and action[2][0][1] in useless_dict and action[2][0][1] != str(self.current_rank):
+                if teammate == 1 and action[0] == 'Single' and action[2][0][1] in useless_dict and action[2][0][1] != RANK_INVERSE[self.current_rank]:
                     addition[i] += 1.0 * add_weight * \
                         (1 + useless_dict[action[2][0][1]])
                 elif teammate == 2 and (action[0] in ['Single', 'Pair']):
